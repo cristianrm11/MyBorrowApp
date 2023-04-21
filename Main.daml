@@ -1,0 +1,52 @@
+module Main where
+import Daml.Script
+type ItemCustodyId = ContractId ItemCustody
+
+template ItemCustody
+    with
+        owner : Party
+        custodian : Party
+        itemName : Text
+    where
+        signatory owner
+        choice ReleaseItemTo : ItemCustodyId with
+            friend : Party
+                controller owner
+                    do
+                        create this with
+                            custodian = friend
+
+        signatory owner
+        choice ReturnItemTo : ItemCustodyId with
+            rightfulOwner : Party
+                controller custodian
+                    do
+                        create this with
+                            owner = rightfulOwner
+        -- deprecated
+        -- controller custodian can
+        --     ReturnItemTo : ItemCustodyId
+        --         with
+        --             rightfulOwner : Party
+        --         do
+        --             create this with
+        --                 owner = rightfulOwner
+
+
+--test
+test : Script ItemCustodyId
+test = script do
+    jerry <- allocateParty "Jerry"
+    elaine <- allocateParty "Elaine"
+
+    brandNewCamera <- submit jerry do
+        createCmd ItemCustody with
+            owner = jerry
+            custodian = jerry
+            itemName = "Really Expensive Camera"
+    
+    elaineHasCamera <- submit jerry do
+        exerciseCmd brandNewCamera ReleaseItemTo with friend = elaine
+
+    submit elaine do
+        exerciseCmd elaineHasCamera ReturnItemTo with rightfulOwner = jerry
